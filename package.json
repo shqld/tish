@@ -1,0 +1,32 @@
+{
+    "name": "tish",
+    "version": "0.0.2",
+    "main": "src/index.js",
+    "repository": "git@github.com:shqld/tish.git",
+    "author": "Sho Miyamoto <me@shomiyamoto.dev>",
+    "license": "MIT",
+    "files": [
+        "dist/*"
+    ],
+    "scripts": {
+        "dev": "babel-node -x .ts",
+        "build": "babel -x .ts src -d dist",
+        "test": "jest",
+        "prepublish": "yarn build"
+    },
+    "dependencies": {
+        "debug": "^4.1.1"
+    },
+    "devDependencies": {
+        "@babel/cli": "^7.8.3",
+        "@babel/core": "^7.8.3",
+        "@babel/node": "^7.8.3",
+        "@babel/preset-env": "^7.8.3",
+        "@babel/preset-typescript": "^7.8.3",
+        "@types/debug": "^4.1.5",
+        "@types/jest": "^24.9.1",
+        "@types/node": "^13.5.0",
+        "jest": "^25.1.0",
+        "typescript": "^3.7.5"
+    }
+}
