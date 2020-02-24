@@ -1,7 +1,7 @@
 {
     "name": "tish",
     "version": "0.0.3",
-    "main": "src/index.js",
+    "main": "dist/index.js",
     "repository": "git@github.com:shqld/tish.git",
     "author": "Sho Miyamoto <me@shomiyamoto.dev>",
     "license": "MIT",
