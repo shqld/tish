@@ -54,10 +54,11 @@ No child process are run unless called with `await` keyword or `then` method, ev
 -   [ ] Enriching options, e.g. watermark, etc...
 -   [ ] Support `&` operator
 -   [ ] Support auto escaping for quotes, regex etc.
--   [ ] Optimization with generators for large array
+-   [x] Optimization with generators for large array
 -   [ ] Handling stderr
 -   [ ] Handling shell variable
 -   [ ] Creating child instances set options by default
+-   [ ] Support `set` command for shell configuration
 
 ## Usecases
 
@@ -99,7 +100,7 @@ done
 ```
 
 ```js
-for (const filePath of await $('file').toArray()) {
+for await (const log of $('git log --oneline HEAD~2..')) {
     // some operations...
 }
 ```

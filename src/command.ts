@@ -127,6 +127,17 @@ export class Command extends Promise {
         })
     }
 
+    async *[Symbol.asyncIterator]() {
+        const passThrough = new PassThrough()
+        passThrough.setEncoding('utf8')
+
+        this.output = passThrough
+
+        await this
+
+        yield passThrough.read()
+    }
+
     pipe(command: Command | string, options?: cp.SpawnOptions): Command {
         this.debug('pipe')
 
