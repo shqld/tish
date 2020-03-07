@@ -8,11 +8,12 @@
     "files": [
         "dist/*"
     ],
+    "types": "src/index.ts",
     "scripts": {
         "dev": "babel-node -x .ts",
         "build": "babel -x .ts src -d dist",
         "test": "jest",
-        "prepublish": "yarn build"
+        "prepublishOnly": "yarn build"
     },
     "dependencies": {
         "debug": "^4.1.1"
