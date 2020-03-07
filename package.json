@@ -2,13 +2,14 @@
     "name": "tish",
     "version": "0.0.6",
     "main": "dist/index.js",
+    "module": "src/index.ts",
+    "types": "src/index.ts",
     "repository": "git@github.com:shqld/tish.git",
     "author": "Sho Miyamoto <me@shomiyamoto.dev>",
     "license": "MIT",
     "files": [
         "dist/*"
     ],
-    "types": "src/index.ts",
     "scripts": {
         "dev": "babel-node -x .ts",
         "build": "babel -x .ts src -d dist",
