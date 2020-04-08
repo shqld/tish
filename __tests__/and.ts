@@ -18,7 +18,7 @@ describe('and', () => {
 
             expect([...first.res, ...second.res].join('')).toStrictEqual(
                 execSync(shell, {
-                    encoding: 'utf8'
+                    encoding: 'utf8',
                 })
             )
         })
@@ -34,7 +34,7 @@ describe('and', () => {
 
             expect(res.join('')).toStrictEqual(
                 execSync(shell, {
-                    encoding: 'utf8'
+                    encoding: 'utf8',
                 })
             )
         })

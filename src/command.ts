@@ -81,7 +81,7 @@ export class Command extends Promise {
             if (this.input) this.input.pipe(proc.stdin)
 
             return new Promise((resolve, reject) => {
-                proc.on('exit', status => {
+                proc.on('exit', (status) => {
                     proc.on('close', () => {
                         this.debug('exit & close', { status })
 
@@ -113,8 +113,8 @@ export class Command extends Promise {
 
             if (this.input) this.input.pipe(proc.stdin)
 
-            return new Promise(resolve => {
-                proc.on('exit', status => {
+            return new Promise((resolve) => {
+                proc.on('exit', (status) => {
                     proc.on('close', () => {
                         this.debug('exit & close', { status })
 
@@ -179,7 +179,7 @@ export class Command extends Promise {
         const buf: Array<Buffer> = []
 
         const mock = new PassThrough()
-        mock.on('data', chunk => buf.push(chunk))
+        mock.on('data', (chunk) => buf.push(chunk))
 
         this.output = mock
 
@@ -199,7 +199,7 @@ export class Command extends Promise {
 
         const mock = new PassThrough()
         mock.setEncoding('utf8')
-        mock.on('data', chunk => {
+        mock.on('data', (chunk) => {
             buf.push(...chunk.trim().split('\n'))
         })
 
@@ -209,10 +209,10 @@ export class Command extends Promise {
     }
 
     isFailed(): Promise<boolean> {
-        return this.then(status => status !== 0).catch(() => true)
+        return this.then((status) => status !== 0).catch(() => true)
     }
 
     isSucceeded(): Promise<boolean> {
-        return this.then(status => status === 0).catch(() => false)
+        return this.then((status) => status === 0).catch(() => false)
     }
 }

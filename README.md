@@ -20,14 +20,10 @@ import { $ } from 'tish'
 
 // $ echo hello && echo world | sed 's/world/世界/'
 
-$('echo hello')
-    .and('echo world')
-    .pipe('sed "s/world/世界/"')
+$('echo hello').and('echo world').pipe('sed "s/world/世界/"')
 // nothing happens
 
-await $('echo hello')
-    .and('echo world')
-    .pipe('sed "s/world/世界/"')
+await $('echo hello').and('echo world').pipe('sed "s/world/世界/"')
 // child processes are actually run
 ```
 
@@ -69,9 +65,7 @@ $ echo hello | sed 's/hello/こんにちは/' && echo world
 ```
 
 ```js
-await $('echo hello')
-    .pipe("sed 's/hello/こんにちは/'")
-    .and('echo world')
+await $('echo hello').pipe("sed 's/hello/こんにちは/'").and('echo world')
 ```
 
 ### `>` and `||`
@@ -81,9 +75,7 @@ $ [ -s $file_path ] || echo "hello, world" > $file_path
 ```
 
 ```js
-await $('[ -s $file_path ]')
-    .or('echo "hello, world"')
-    .toFile('$file_path')
+await $('[ -s $file_path ]').or('echo "hello, world"').toFile('$file_path')
 
 // ----- You can make code more readable ------
 

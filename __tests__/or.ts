@@ -15,7 +15,7 @@ describe('or', () => {
 
             expect(res.join('')).toStrictEqual(
                 execSync(shell, {
-                    encoding: 'utf8'
+                    encoding: 'utf8',
                 })
             )
         })

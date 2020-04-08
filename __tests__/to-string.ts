@@ -15,8 +15,6 @@ describe('toString', () => {
             .toString()
             .then(() => $('echo ccc', { overrideOutput: mock }))
 
-        expect(res.join()).toStrictEqual(
-            execSync('echo ccc', { encoding: 'utf8' })
-        )
+        expect(res.join()).toStrictEqual(execSync('echo ccc', { encoding: 'utf8' }))
     })
 })
