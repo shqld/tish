@@ -56,7 +56,7 @@ No child process are run unless called with `await` keyword or `then` method, ev
 -   [ ] Creating child instances set options by default
 -   [ ] Support `set` command for shell configuration
 -   [ ] Wrap thrown error by ChildProcess with a dedicated Error
--   [ ] Trim output string by default when `toString`
+-   [x] Trim output string by default when `toString`
 
 ## Usecases
 

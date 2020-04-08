@@ -183,7 +183,7 @@ export class Command extends Promise {
 
         this.output = mock
 
-        return this.then(() => Buffer.concat(buf).toString())
+        return this.then(() => Buffer.concat(buf).toString().trim())
     }
 
     toFile(filePath: string): Promise<void> {
