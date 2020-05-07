@@ -208,11 +208,11 @@ export class Command extends Promise {
         return this.then(() => buf)
     }
 
-    isFailed(): Promise<boolean> {
-        return this.then((status) => status !== 0).catch(() => true)
+    toNumber() {
+        return this.then((status) => status).catch((status) => status)
     }
 
-    isSucceeded(): Promise<boolean> {
-        return this.then((status) => status === 0).catch(() => false)
+    toBoolean() {
+        return this.then(() => true).catch(() => false)
     }
 }

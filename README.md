@@ -57,6 +57,7 @@ No child process are run unless called with `await` keyword or `then` method, ev
 -   [ ] Support `set` command for shell configuration
 -   [ ] Wrap thrown error by ChildProcess with a dedicated Error
 -   [x] Trim output string by default when `toString`
+-   [x] Implement `toNumber` and `toBoolean`
 
 ## Usecases
 
@@ -110,7 +111,7 @@ fi
 ```
 
 ```js
-if (await $('git diff --quiet').isSucceeded()) {
+if (await $('git diff --quiet').toBoolean()) {
     // no change
 } else {
     // changed
