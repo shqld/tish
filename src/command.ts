@@ -21,7 +21,10 @@ const defaultConfig: Config = Object.freeze({
     output: process.stdout,
 })
 
-// @ts-ignore
+const noop = () => {}
+
+// @ts-ignore suppress
+// > No base constructor has the specified number of type arguments.ts(2508)
 export class Command extends Promise {
     id: string
     name: string
@@ -32,21 +35,11 @@ export class Command extends Promise {
     input?: Readable
     private chain: () => Promise<any>
     private debug: (...args: Array<any>) => void;
-    // private resolve: Function
-    // private reject: Function
 
     [Symbol.toStringTag] = 'Command'
 
     constructor(name: string, args: Array<string>, options: Options) {
-        // let _resolve, _reject
-
-        super((resolve, reject) => {
-            // _resolve = resolve
-            // _reject = reject
-        })
-
-        // this.resolve = _resolve
-        // this.reject = _reject
+        super(noop)
 
         this.id = getId()
 
@@ -124,13 +117,9 @@ export class Command extends Promise {
                         this.debug('exit & close', { status })
 
                         if (status !== 0) {
-                            if (onRejected) reject(onRejected(status, proc))
-
-                            reject(status)
+                            reject(onRejected ? onRejected(status, proc) : status)
                         } else {
-                            if (onFulfilled) resolve(onFulfilled(status, proc))
-
-                            resolve(status)
+                            resolve(onFulfilled ? onFulfilled(status, proc) : status)
                         }
                     })
                 })
@@ -236,9 +225,7 @@ export class Command extends Promise {
 
         const mock = new PassThrough()
         mock.setEncoding('utf8')
-        mock.on('data', (chunk) => {
-            buf.push(...chunk.trim().split('\n'))
-        })
+        mock.on('data', (chunk) => buf.push(...chunk.trim().split('\n')))
 
         this.config.output = mock
 
