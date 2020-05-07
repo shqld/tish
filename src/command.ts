@@ -2,6 +2,7 @@ import createDebug from 'debug'
 import * as cp from 'child_process'
 import * as fs from 'fs'
 import { Writable, PassThrough, Readable } from 'stream'
+import spawn from 'cross-spawn'
 
 const debug = createDebug('tish')
 
@@ -69,7 +70,7 @@ export class Command extends Promise {
         return this.chain().then(() => {
             this.debug('run')
 
-            const proc = cp.spawn(this.name, this.args, {
+            const proc = spawn(this.name, this.args, {
                 shell: true,
                 ...this.options,
             })
@@ -106,7 +107,7 @@ export class Command extends Promise {
         return this.chain().then(() => {
             this.debug('run')
 
-            const proc = cp.spawn(this.name, this.args, this.options)
+            const proc = spawn(this.name, this.args, this.options)
 
             const output = this.options.overrideOutput || this.output
             if (output) proc.stdout.pipe(output)
