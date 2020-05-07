@@ -1,5 +1,7 @@
-import { Command } from './command'
+import { Command, Options } from './command'
 
-export const $ = Command.create
+declare function create(command: string, options?: Options): Command
 
-export { Command }
+export const $: typeof create = Command.create.bind(Command)
+
+export * from './command'

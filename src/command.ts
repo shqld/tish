@@ -11,11 +11,11 @@ const getId = () => {
     return `${d.getUTCMilliseconds()}${Math.floor(Math.random() * 100)}`
 }
 
-interface Config {
+export interface Config {
     output?: Writable
 }
 
-type Options = Partial<Config>
+export type Options = Partial<Config>
 
 const defaultConfig: Config = Object.freeze({
     output: process.stdout,
@@ -53,6 +53,7 @@ export class Command extends Promise {
         this.name = name
         this.args = args
 
+        // needed for extend
         const Class = this.constructor as typeof Command
 
         this.config = {
@@ -68,10 +69,34 @@ export class Command extends Promise {
 
     static defaultConfig = defaultConfig
 
-    static create(command: string, options?: Options): Command {
+    static create<T extends typeof Command>(
+        this: T,
+        command: string,
+        options?: Options
+    ): InstanceType<T> {
+        // needed for extend
+        const Class: T = this
         const [name, ...args] = command.split(' ')
 
-        return new Command(name, args, options)
+        return new Class(name, args, options) as InstanceType<T>
+    }
+
+    static extend<T extends typeof Command>(this: T, options: Options): T {
+        // needed for extend
+        const Class = this
+
+        const defaultConfig = {
+            ...Class.defaultConfig,
+            ...options,
+        }
+
+        // @ts-ignore suppress
+        // > A mixin class must have a constructor with a single rest parameter of type 'any[]'.ts(2545)
+        class ExtendedClass extends Class {
+            static defaultConfig = defaultConfig
+        }
+
+        return ExtendedClass
     }
 
     then<T, C>(
