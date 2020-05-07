@@ -10,8 +10,8 @@ describe('Promise.all', () => {
         const output2 = createMockOutput()
 
         await Promise.all([
-            $('echo aaa', { overrideOutput: output1.mock }),
-            $('echo bbb', { overrideOutput: output2.mock }),
+            $('echo aaa', { output: output1.mock }),
+            $('echo bbb', { output: output2.mock }),
         ])
 
         const res = output1.res.concat(output2.res).join('')
@@ -23,8 +23,8 @@ describe('Promise.all', () => {
         const output2 = createMockOutput()
 
         await Promise.all([
-            $('sleep 0.1').then(() => $('echo slept', { overrideOutput: output1.mock })),
-            $('echo bbb', { overrideOutput: output2.mock }),
+            $('sleep 0.1').then(() => $('echo slept', { output: output1.mock })),
+            $('echo bbb', { output: output2.mock }),
         ])
 
         const res = output1.res.concat(output2.res)

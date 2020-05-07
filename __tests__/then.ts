@@ -9,7 +9,7 @@ describe('then', () => {
         it('single', () => {
             const { res, mock } = createMockOutput()
 
-            return $('echo string', { overrideOutput: mock }).then((status) => {
+            return $('echo string', { output: mock }).then((status) => {
                 expect(status).toEqual(0)
                 expect(res.join()).toStrictEqual(execSync('echo string', { encoding: 'utf8' }))
             })
@@ -19,14 +19,14 @@ describe('then', () => {
             const first = createMockOutput()
             const second = createMockOutput()
 
-            return $('echo first', { overrideOutput: first.mock })
+            return $('echo first', { output: first.mock })
                 .then((status) => {
                     expect(status).toEqual(0)
                     expect(first.res.join()).toStrictEqual(
                         execSync('echo first', { encoding: 'utf8' })
                     )
 
-                    return $('echo second', { overrideOutput: second.mock })
+                    return $('echo second', { output: second.mock })
                 })
                 .then((status) => {
                     expect(status).toEqual(0)
@@ -42,7 +42,7 @@ describe('then', () => {
             return $('sleep 0.001')
                 .then((status) => {
                     expect(status).toEqual(0)
-                    return $('echo string', { overrideOutput: mock })
+                    return $('echo string', { output: mock })
                 })
                 .then((status) => {
                     expect(status).toEqual(0)
@@ -54,7 +54,7 @@ describe('then', () => {
             const { res, mock } = createMockOutput()
 
             const c1 = $('sleep 0.1')
-            const c2 = $('echo string', { overrideOutput: mock })
+            const c2 = $('echo string', { output: mock })
 
             c1.then(() => c2).then((status) => {
                 expect(status).toEqual(0)
@@ -65,7 +65,7 @@ describe('then', () => {
         it('async/await', async () => {
             const { res, mock } = createMockOutput()
 
-            const status = await $('echo string', { overrideOutput: mock })
+            const status = await $('echo string', { output: mock })
 
             expect(status).toEqual(0)
             expect(res.join()).toStrictEqual(execSync('echo string', { encoding: 'utf8' }))
@@ -75,7 +75,7 @@ describe('then', () => {
             const { res, mock } = createMockOutput()
 
             await $('sleep 0.001')
-            const status = await $('echo string', { overrideOutput: mock })
+            const status = await $('echo string', { output: mock })
 
             expect(status).toEqual(0)
             expect(res.join()).toStrictEqual(execSync('echo string', { encoding: 'utf8' }))

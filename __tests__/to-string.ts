@@ -13,7 +13,7 @@ describe('toString', () => {
 
         await $('echo bbb')
             .toString()
-            .then(() => $('echo ccc', { overrideOutput: mock }))
+            .then(() => $('echo ccc', { output: mock }))
 
         expect(res.join()).toStrictEqual(execSync('echo ccc', { encoding: 'utf8' }))
     })

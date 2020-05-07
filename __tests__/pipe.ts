@@ -8,7 +8,7 @@ describe('pipe', () => {
     it('basic', async () => {
         const { res, mock } = createMockOutput()
 
-        await $('echo aaa').pipe($('cat', { overrideOutput: mock }))
+        await $('echo aaa').pipe($('cat', { output: mock }))
 
         expect(res.join('')).toStrictEqual(execSync('echo aaa | cat', { encoding: 'utf8' }))
     })
@@ -16,7 +16,7 @@ describe('pipe', () => {
     it('sed', async () => {
         const { res, mock } = createMockOutput()
 
-        await $('echo hello').pipe($('sed "s/hello/こんにちは/"', { overrideOutput: mock }))
+        await $('echo hello').pipe($('sed "s/hello/こんにちは/"', { output: mock }))
 
         expect(res.join('')).toStrictEqual(
             execSync("echo hello | sed 's/hello/こんにちは/'", { encoding: 'utf8' })
@@ -28,7 +28,7 @@ describe('pipe', () => {
 
         const status = await $('echo aaa')
             .pipe($('cat -n'))
-            .pipe($('cat', { overrideOutput: mock }))
+            .pipe($('cat', { output: mock }))
 
         expect(status).toEqual(0)
         expect(res.join('')).toStrictEqual(

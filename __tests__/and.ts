@@ -12,8 +12,8 @@ describe('and', () => {
             const first = createMockOutput()
             const second = createMockOutput()
 
-            await $('echo first', { overrideOutput: first.mock }).and(
-                $('echo second', { overrideOutput: second.mock })
+            await $('echo first', { output: first.mock }).and(
+                $('echo second', { output: second.mock })
             )
 
             expect([...first.res, ...second.res].join('')).toStrictEqual(
@@ -30,7 +30,7 @@ describe('and', () => {
         it(shell, async () => {
             const { res, mock } = createMockOutput()
 
-            await $('sleep 0.1').and($('echo string', { overrideOutput: mock }))
+            await $('sleep 0.1').and($('echo string', { output: mock }))
 
             expect(res.join('')).toStrictEqual(
                 execSync(shell, {

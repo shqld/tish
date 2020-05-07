@@ -11,7 +11,7 @@ describe('or', () => {
         it(shell, async () => {
             const { res, mock } = createMockOutput()
 
-            await $('false').or($('echo string', { overrideOutput: mock }))
+            await $('false').or($('echo string', { output: mock }))
 
             expect(res.join('')).toStrictEqual(
                 execSync(shell, {

@@ -11,19 +11,24 @@ const getId = () => {
     return `${d.getUTCMilliseconds()}${Math.floor(Math.random() * 100)}`
 }
 
-interface Options extends cp.SpawnOptions {
-    overrideOutput?: Writable
+interface Config {
+    output?: Writable
 }
+
+type Options = Partial<Config>
+
+const defaultConfig: Config = Object.freeze({
+    output: process.stdout,
+})
 
 // @ts-ignore
 export class Command extends Promise {
     id: string
     name: string
     args: Array<string>
-    options: Options
+    config: Config
     status?: number
     promise: () => Promise<any>
-    output: Writable
     input?: Readable
     private chain: () => Promise<any>
     private debug: (...args: Array<any>) => void;
@@ -47,18 +52,26 @@ export class Command extends Promise {
 
         this.name = name
         this.args = args
-        this.options = options
 
-        this.output = process.stdout
+        const Class = this.constructor as typeof Command
+
+        this.config = {
+            ...Class.defaultConfig,
+            ...options,
+        }
+
         this.chain = () => Promise.resolve()
 
         const scopedDebug = debug.extend(this.id)
         this.debug = (...args) => scopedDebug(`(${[this.name, ...this.args].join(' ')})`, ...args)
     }
 
+    static defaultConfig = defaultConfig
+
     static create(command: string, options?: Options): Command {
         const [name, ...args] = command.split(' ')
-        return new Command(name, args, { ...options, stdio: 'pipe' })
+
+        return new Command(name, args, options)
     }
 
     then<T, C>(
@@ -71,12 +84,11 @@ export class Command extends Promise {
             this.debug('run')
 
             const proc = spawn(this.name, this.args, {
+                stdio: 'pipe',
                 shell: true,
-                ...this.options,
             })
 
-            const output = this.options.overrideOutput || this.output
-            if (output) proc.stdout.pipe(output)
+            proc.stdout.pipe(this.config.output)
             proc.stderr.pipe(process.stderr)
 
             if (this.input) this.input.pipe(proc.stdin)
@@ -107,10 +119,9 @@ export class Command extends Promise {
         return this.chain().then(() => {
             this.debug('run')
 
-            const proc = spawn(this.name, this.args, this.options)
+            const proc = spawn(this.name, this.args)
 
-            const output = this.options.overrideOutput || this.output
-            if (output) proc.stdout.pipe(output)
+            proc.stdout.pipe(this.config.output)
 
             if (this.input) this.input.pipe(proc.stdin)
 
@@ -132,20 +143,20 @@ export class Command extends Promise {
         const passThrough = new PassThrough()
         passThrough.setEncoding('utf8')
 
-        this.output = passThrough
+        this.config.output = passThrough
 
         await this
 
         yield passThrough.read()
     }
 
-    pipe(command: Command | string, options?: cp.SpawnOptions): Command {
+    pipe(command: Command | string): Command {
         this.debug('pipe')
 
         const next = command instanceof Command ? command : Command.create(command)
 
         const passThrough = new PassThrough()
-        this.output = passThrough
+        this.config.output = passThrough
         next.input = passThrough
 
         const chain = next.chain
@@ -182,7 +193,7 @@ export class Command extends Promise {
         const mock = new PassThrough()
         mock.on('data', (chunk) => buf.push(chunk))
 
-        this.output = mock
+        this.config.output = mock
 
         return this.then(() => Buffer.concat(buf).toString().trim())
     }
@@ -190,7 +201,7 @@ export class Command extends Promise {
     toFile(filePath: string): Promise<void> {
         this.debug('to')
 
-        this.output = fs.createWriteStream(filePath)
+        this.config.output = fs.createWriteStream(filePath)
 
         return this.then()
     }
@@ -204,7 +215,7 @@ export class Command extends Promise {
             buf.push(...chunk.trim().split('\n'))
         })
 
-        this.output = mock
+        this.config.output = mock
 
         return this.then(() => buf)
     }
