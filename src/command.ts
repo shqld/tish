@@ -20,7 +20,7 @@ export type Options = Partial<Config>
 
 const defaultConfig: Config = Object.freeze({
     input: undefined,
-    output: process.stdout,
+    output: undefined,
 })
 
 const noop = () => {}
@@ -107,7 +107,7 @@ export class Command extends Promise {
                 shell: true,
             })
 
-            if (proc.stdout && this.config.output) proc.stdout.pipe(this.config.output)
+            if (this.config.output && proc.stdout) proc.stdout.pipe(this.config.output)
             // TODO(@shqld)
             proc.stderr?.pipe(process.stderr)
 
@@ -140,7 +140,7 @@ export class Command extends Promise {
 
             const proc = spawn(this.name, this.args)
 
-            if (proc.stdout && this.config.output) proc.stdout.pipe(this.config.output)
+            if (this.config.output && proc.stdout) proc.stdout.pipe(this.config.output)
 
             if (this.config.input && proc.stdin) this.config.input.pipe(proc.stdin)
 
