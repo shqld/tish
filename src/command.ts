@@ -31,14 +31,13 @@ export class Command extends Promise {
     args: Array<string>
     config: Config
     status?: number
-    promise: () => Promise<any>
     input?: Readable
     private chain: () => Promise<any>
     private debug: (...args: Array<any>) => void;
 
     [Symbol.toStringTag] = 'Command'
 
-    constructor(name: string, args: Array<string>, options: Options) {
+    constructor(name: string, args: Array<string>, options?: Options) {
         super(noop)
 
         this.id = getId()
@@ -93,8 +92,8 @@ export class Command extends Promise {
     }
 
     then<T, C>(
-        onFulfilled?: (status: number, proc: cp.ChildProcess) => T,
-        onRejected?: (status: number, proc: cp.ChildProcess) => C
+        onFulfilled?: ((status: number, proc: cp.ChildProcess) => T) | null,
+        onRejected?: ((status: number, proc: cp.ChildProcess) => C) | null
     ): Promise<any> {
         this.debug('then')
 
@@ -106,17 +105,21 @@ export class Command extends Promise {
                 shell: true,
             })
 
-            proc.stdout.pipe(this.config.output)
-            proc.stderr.pipe(process.stderr)
+            if (proc.stdout && this.config.output) proc.stdout.pipe(this.config.output)
+            // TODO(@shqld)
+            proc.stderr?.pipe(process.stderr)
 
-            if (this.input) this.input.pipe(proc.stdin)
+            if (this.input && proc.stdin) this.input.pipe(proc.stdin)
 
             return new Promise((resolve, reject) => {
                 proc.on('exit', (status) => {
                     proc.on('close', () => {
                         this.debug('exit & close', { status })
 
-                        if (status !== 0) {
+                        if (typeof status !== 'number') {
+                            // TODO(@shqld): a dedicated error
+                            throw new Error()
+                        } else if (status !== 0) {
                             reject(onRejected ? onRejected(status, proc) : status)
                         } else {
                             resolve(onFulfilled ? onFulfilled(status, proc) : status)
@@ -135,16 +138,19 @@ export class Command extends Promise {
 
             const proc = spawn(this.name, this.args)
 
-            proc.stdout.pipe(this.config.output)
+            if (proc.stdout && this.config.output) proc.stdout.pipe(this.config.output)
 
-            if (this.input) this.input.pipe(proc.stdin)
+            if (proc.stdin && this.input) this.input.pipe(proc.stdin)
 
             return new Promise((resolve) => {
                 proc.on('exit', (status) => {
                     proc.on('close', () => {
                         this.debug('exit & close', { status })
 
-                        if (status !== 0) {
+                        if (typeof status !== 'number') {
+                            // TODO(@shqld): a dedicated error
+                            throw new Error()
+                        } else if (status !== 0) {
                             resolve(onRejected(status, proc))
                         }
                     })
@@ -232,11 +238,11 @@ export class Command extends Promise {
         return this.then(() => buf)
     }
 
-    toNumber() {
+    toNumber(): Promise<number> {
         return this.then((status) => status).catch((status) => status)
     }
 
-    toBoolean() {
+    toBoolean(): Promise<boolean> {
         return this.then(() => true).catch(() => false)
     }
 }
