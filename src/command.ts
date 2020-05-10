@@ -12,12 +12,14 @@ const getId = () => {
 }
 
 export interface Config {
+    input?: Readable
     output?: Writable
 }
 
 export type Options = Partial<Config>
 
 const defaultConfig: Config = Object.freeze({
+    input: undefined,
     output: process.stdout,
 })
 
@@ -27,16 +29,15 @@ const initialChain = () => Promise.resolve()
 // @ts-ignore suppress
 // > No base constructor has the specified number of type arguments.ts(2508)
 export class Command extends Promise {
-    id: string
-    name: string
-    args: Array<string>
-    config: Config
-    status?: number
-    input?: Readable
-    private chain: () => Promise<any>
-    private debug: (...args: Array<any>) => void;
+    public readonly name: string
+    public readonly args: Array<string>
+    public readonly config: Config
 
-    [Symbol.toStringTag] = 'Command'
+    private id: string
+    private chain: () => Promise<any>
+    private debug: (...args: Array<any>) => void
+
+    protected [Symbol.toStringTag] = 'Command'
 
     constructor(name: string, args: Array<string>, options?: Options) {
         super(noop)
@@ -110,7 +111,7 @@ export class Command extends Promise {
             // TODO(@shqld)
             proc.stderr?.pipe(process.stderr)
 
-            if (this.input && proc.stdin) this.input.pipe(proc.stdin)
+            if (this.config.input && proc.stdin) this.config.input.pipe(proc.stdin)
 
             return new Promise((resolve, reject) => {
                 proc.on('exit', (status) => {
@@ -141,7 +142,7 @@ export class Command extends Promise {
 
             if (proc.stdout && this.config.output) proc.stdout.pipe(this.config.output)
 
-            if (proc.stdin && this.input) this.input.pipe(proc.stdin)
+            if (this.config.input && proc.stdin) this.config.input.pipe(proc.stdin)
 
             return new Promise((resolve) => {
                 proc.on('exit', (status) => {
@@ -178,7 +179,7 @@ export class Command extends Promise {
 
         const passThrough = new PassThrough()
         this.config.output = passThrough
-        next.input = passThrough
+        next.config.input = passThrough
 
         const chain = next.chain
         next.chain = () => this.then(chain)
