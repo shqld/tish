@@ -22,6 +22,7 @@ const defaultConfig: Config = Object.freeze({
 })
 
 const noop = () => {}
+const initialChain = () => Promise.resolve()
 
 // @ts-ignore suppress
 // > No base constructor has the specified number of type arguments.ts(2508)
@@ -53,7 +54,7 @@ export class Command extends Promise {
             ...options,
         }
 
-        this.chain = () => Promise.resolve()
+        this.chain = initialChain
 
         const scopedDebug = debug.extend(this.id)
         this.debug = (...args) => scopedDebug(`(${[this.name, ...this.args].join(' ')})`, ...args)
