@@ -9,7 +9,7 @@ describe('then', () => {
         it('single', () => {
             const { res, mock } = createMockOutput()
 
-            return $('echo string', { output: mock }).then((status) => {
+            return $('echo string', { output: mock }).then(({ status }) => {
                 expect(status).toEqual(0)
                 expect(res.join()).toStrictEqual(execSync('echo string', { encoding: 'utf8' }))
             })
@@ -20,7 +20,7 @@ describe('then', () => {
             const second = createMockOutput()
 
             return $('echo first', { output: first.mock })
-                .then((status) => {
+                .then(({ status }) => {
                     expect(status).toEqual(0)
                     expect(first.res.join()).toStrictEqual(
                         execSync('echo first', { encoding: 'utf8' })
@@ -28,7 +28,7 @@ describe('then', () => {
 
                     return $('echo second', { output: second.mock })
                 })
-                .then((status) => {
+                .then(({ status }) => {
                     expect(status).toEqual(0)
                     expect(second.res.join()).toStrictEqual(
                         execSync('echo second', { encoding: 'utf8' })
@@ -40,11 +40,11 @@ describe('then', () => {
             const { res, mock } = createMockOutput()
 
             return $('sleep 0.001')
-                .then((status) => {
+                .then(({ status }) => {
                     expect(status).toEqual(0)
                     return $('echo string', { output: mock })
                 })
-                .then((status) => {
+                .then(({ status }) => {
                     expect(status).toEqual(0)
                     expect(res.join()).toStrictEqual(execSync('echo string', { encoding: 'utf8' }))
                 })
@@ -56,7 +56,7 @@ describe('then', () => {
             const c1 = $('sleep 0.1')
             const c2 = $('echo string', { output: mock })
 
-            c1.then(() => c2).then((status) => {
+            c1.then(() => c2).then(({ status }) => {
                 expect(status).toEqual(0)
                 expect(res.join()).toStrictEqual(execSync('echo string', { encoding: 'utf8' }))
             })
@@ -65,7 +65,7 @@ describe('then', () => {
         it('async/await', async () => {
             const { res, mock } = createMockOutput()
 
-            const status = await $('echo string', { output: mock })
+            const { status } = await $('echo string', { output: mock })
 
             expect(status).toEqual(0)
             expect(res.join()).toStrictEqual(execSync('echo string', { encoding: 'utf8' }))
@@ -75,7 +75,7 @@ describe('then', () => {
             const { res, mock } = createMockOutput()
 
             await $('sleep 0.001')
-            const status = await $('echo string', { output: mock })
+            const { status } = await $('echo string', { output: mock })
 
             expect(status).toEqual(0)
             expect(res.join()).toStrictEqual(execSync('echo string', { encoding: 'utf8' }))

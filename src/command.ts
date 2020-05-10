@@ -26,6 +26,16 @@ const defaultConfig: Config = Object.freeze({
 const noop = () => {}
 const initialChain = () => Promise.resolve()
 
+export interface Result {}
+export interface Success extends Result {
+    status: 0
+    proc: cp.ChildProcess
+}
+export interface Failure extends Result {
+    status: number
+    proc: cp.ChildProcess
+}
+
 // @ts-ignore suppress
 // > No base constructor has the specified number of type arguments.ts(2508)
 export class Command extends Promise {
@@ -93,9 +103,9 @@ export class Command extends Promise {
         return ExtendedClass
     }
 
-    then<T, C>(
-        onFulfilled?: ((status: number, proc: cp.ChildProcess) => T) | null,
-        onRejected?: ((status: number, proc: cp.ChildProcess) => C) | null
+    then<T = Success, C = Failure>(
+        onFulfilled?: ((result: Success) => T) | null,
+        onRejected?: ((result: Failure) => C) | null
     ): Promise<any> {
         this.debug('then')
 
@@ -121,10 +131,14 @@ export class Command extends Promise {
                         if (typeof status !== 'number') {
                             // TODO(@shqld): a dedicated error
                             throw new Error()
-                        } else if (status !== 0) {
-                            reject(onRejected ? onRejected(status, proc) : status)
+                        }
+
+                        if (status !== 0) {
+                            const result = { status, proc }
+                            reject(onRejected ? onRejected(result) : result)
                         } else {
-                            resolve(onFulfilled ? onFulfilled(status, proc) : status)
+                            const result: Success = { status, proc }
+                            resolve(onFulfilled ? onFulfilled(result) : result)
                         }
                     })
                 })
@@ -132,7 +146,7 @@ export class Command extends Promise {
         })
     }
 
-    catch<T>(onRejected: (status: number, proc: cp.ChildProcess) => T): Promise<any> {
+    catch<T>(onRejected: (result: Failure) => T): Promise<any> {
         this.debug('catch')
 
         return this.chain().then(() => {
@@ -153,7 +167,7 @@ export class Command extends Promise {
                             // TODO(@shqld): a dedicated error
                             throw new Error()
                         } else if (status !== 0) {
-                            resolve(onRejected(status, proc))
+                            resolve(onRejected({ status, proc }))
                         }
                     })
                 })
@@ -241,7 +255,7 @@ export class Command extends Promise {
     }
 
     toNumber(): Promise<number> {
-        return this.then((status) => status).catch((status) => status)
+        return this.then(({ status }) => status).catch(({ status }) => status)
     }
 
     toBoolean(): Promise<boolean> {

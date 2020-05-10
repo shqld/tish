@@ -26,7 +26,7 @@ describe('pipe', () => {
     it('chained', async () => {
         const { res, mock } = createMockOutput()
 
-        const status = await $('echo aaa')
+        const { status } = await $('echo aaa')
             .pipe($('cat -n'))
             .pipe($('cat', { output: mock }))
 
