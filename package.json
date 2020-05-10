@@ -14,7 +14,7 @@
     "scripts": {
         "dev": "babel-node -x .ts",
         "build": "babel -x .ts src -d dist",
-        "test": "jest",
+        "test": "tsc && jest",
         "prepublishOnly": "yarn build"
     },
     "dependencies": {
