@@ -23,7 +23,6 @@ const defaultConfig: Config = Object.freeze({
     output: undefined,
 })
 
-const noop = () => {}
 const initialChain = () => Promise.resolve()
 
 export interface Result {}
@@ -36,21 +35,49 @@ export interface Failure extends Result {
     proc: cp.ChildProcess
 }
 
-// @ts-ignore suppress
-// > No base constructor has the specified number of type arguments.ts(2508)
-export class Command extends Promise {
+abstract class LazyPromise<T, C> implements PromiseLike<T> {
+    protected chain: () => Promise<any>
+
+    constructor() {
+        this.chain = initialChain
+    }
+
+    abstract run(): Promise<any>
+
+    then<TResult1 = T, TResult2 = C>(
+        onFulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null,
+        onRejected?:
+            | ((
+                  reason: C | Error
+              ) => TResult1 | PromiseLike<TResult1> | TResult2 | PromiseLike<TResult2>)
+            | null
+    ): Promise<TResult1 | TResult2> {
+        // this.debug('then')
+
+        return this.chain()
+            .then(() => this.run())
+            .then(onFulfilled)
+            .catch(onRejected)
+    }
+
+    catch<T>(onRejected: (result: Failure) => T): Promise<any> {
+        // this.debug('catch')
+
+        return this.chain().then(null, onRejected)
+    }
+}
+
+export class Command extends LazyPromise<Success, Failure> {
     public readonly name: string
     public readonly args: Array<string>
     public readonly config: Config
+    public [Symbol.toStringTag] = 'Command'
 
     private id: string
-    private chain: () => Promise<any>
     private debug: (...args: Array<any>) => void
 
-    protected [Symbol.toStringTag] = 'Command'
-
     constructor(name: string, args: Array<string>, options?: Options) {
-        super(noop)
+        super()
 
         this.id = getId()
 
@@ -64,8 +91,6 @@ export class Command extends Promise {
             ...Class.defaultConfig,
             ...options,
         }
-
-        this.chain = initialChain
 
         const scopedDebug = debug.extend(this.id)
         this.debug = (...args) => scopedDebug(`(${[this.name, ...this.args].join(' ')})`, ...args)
@@ -103,73 +128,39 @@ export class Command extends Promise {
         return ExtendedClass
     }
 
-    then<T = Success, C = Failure>(
-        onFulfilled?: ((result: Success) => T) | null,
-        onRejected?: ((result: Failure) => C) | null
-    ): Promise<any> {
-        this.debug('then')
+    run(): Promise<Result> {
+        this.debug('run')
 
-        return this.chain().then(() => {
-            this.debug('run')
-
-            const proc = spawn(this.name, this.args, {
-                stdio: 'pipe',
-                shell: true,
-            })
-
-            if (this.config.output && proc.stdout) proc.stdout.pipe(this.config.output)
-            // TODO(@shqld)
-            proc.stderr?.pipe(process.stderr)
-
-            if (this.config.input && proc.stdin) this.config.input.pipe(proc.stdin)
-
-            return new Promise((resolve, reject) => {
-                proc.on('exit', (status) => {
-                    proc.on('close', () => {
-                        this.debug('exit & close', { status })
-
-                        if (typeof status !== 'number') {
-                            // TODO(@shqld): a dedicated error
-                            throw new Error()
-                        }
-
-                        if (status !== 0) {
-                            const result = { status, proc }
-                            reject(onRejected ? onRejected(result) : result)
-                        } else {
-                            const result: Success = { status, proc }
-                            resolve(onFulfilled ? onFulfilled(result) : result)
-                        }
-                    })
-                })
-            })
+        const proc = spawn(this.name, this.args, {
+            stdio: 'pipe',
+            shell: true,
         })
-    }
 
-    catch<T>(onRejected: (result: Failure) => T): Promise<any> {
-        this.debug('catch')
+        if (this.config.output && proc.stdout) proc.stdout.pipe(this.config.output)
+        // TODO(@shqld)
+        proc.stderr?.pipe(process.stderr)
 
-        return this.chain().then(() => {
-            this.debug('run')
+        if (this.config.input && proc.stdin) this.config.input.pipe(proc.stdin)
 
-            const proc = spawn(this.name, this.args)
+        return new Promise((resolve, reject) => {
+            proc.on('exit', (status) => {
+                this.debug('exit', { status })
 
-            if (this.config.output && proc.stdout) proc.stdout.pipe(this.config.output)
+                proc.on('close', () => {
+                    this.debug('close')
 
-            if (this.config.input && proc.stdin) this.config.input.pipe(proc.stdin)
+                    if (typeof status !== 'number') {
+                        // TODO(@shqld): a dedicated error
+                        throw new Error()
+                    }
 
-            return new Promise((resolve) => {
-                proc.on('exit', (status) => {
-                    proc.on('close', () => {
-                        this.debug('exit & close', { status })
-
-                        if (typeof status !== 'number') {
-                            // TODO(@shqld): a dedicated error
-                            throw new Error()
-                        } else if (status !== 0) {
-                            resolve(onRejected({ status, proc }))
-                        }
-                    })
+                    if (status !== 0) {
+                        const result: Failure = { status, proc }
+                        reject(result)
+                    } else {
+                        const result: Success = { status, proc }
+                        resolve(result)
+                    }
                 })
             })
         })
@@ -223,6 +214,8 @@ export class Command extends Promise {
         return next
     }
 
+    // @ts-ignore suppress
+    // > Property 'toString' in type 'Command<T>' is not assignable to the same property in base type 'LazyPromise<T>'.
     toString(): Promise<string> {
         const buf: Array<Buffer> = []
 
@@ -259,6 +252,9 @@ export class Command extends Promise {
     }
 
     toBoolean(): Promise<boolean> {
-        return this.then(() => true).catch(() => false)
+        return this.then(
+            () => true,
+            () => false
+        )
     }
 }
