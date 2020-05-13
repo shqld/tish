@@ -14,6 +14,7 @@ const getId = () => {
 export interface Config {
     input?: Readable
     output?: Writable
+    exit: boolean
 }
 
 export type Options = Partial<Config>
@@ -21,21 +22,21 @@ export type Options = Partial<Config>
 const defaultConfig: Config = Object.freeze({
     input: undefined,
     output: undefined,
+    exit: false,
 })
 
 const initialChain = () => Promise.resolve()
 
-export interface Result {}
-export interface Success extends Result {
-    status: 0
-    proc: cp.ChildProcess
-}
-export interface Failure extends Result {
+export interface Result {
     status: number
     proc: cp.ChildProcess
 }
 
-abstract class LazyPromise<T, C> implements PromiseLike<T> {
+export interface TishError extends Error {
+    result?: Result
+}
+
+abstract class LazyPromise<T> implements PromiseLike<T> {
     protected chain: () => Promise<any>
 
     constructor() {
@@ -44,11 +45,11 @@ abstract class LazyPromise<T, C> implements PromiseLike<T> {
 
     abstract run(): Promise<any>
 
-    then<TResult1 = T, TResult2 = C>(
+    then<TResult1 = T, TResult2 = never>(
         onFulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null,
         onRejected?:
             | ((
-                  reason: C | Error
+                  reason: Error | TishError
               ) => TResult1 | PromiseLike<TResult1> | TResult2 | PromiseLike<TResult2>)
             | null
     ): Promise<TResult1 | TResult2> {
@@ -60,14 +61,14 @@ abstract class LazyPromise<T, C> implements PromiseLike<T> {
             .catch(onRejected)
     }
 
-    catch<T>(onRejected: (result: Failure) => T): Promise<any> {
+    catch<T>(onRejected: (result: TishError) => T): Promise<any> {
         // this.debug('catch')
 
         return this.chain().then(null, onRejected)
     }
 }
 
-export class Command extends LazyPromise<Success, Failure> {
+export class Command extends LazyPromise<Result> {
     public readonly name: string
     public readonly args: Array<string>
     public readonly config: Config
@@ -154,11 +155,12 @@ export class Command extends LazyPromise<Success, Failure> {
                         throw new Error()
                     }
 
-                    if (status !== 0) {
-                        const result: Failure = { status, proc }
-                        reject(result)
+                    if (status !== 0 && this.config.exit) {
+                        const err: TishError = new Error('Command failed')
+                        err.result = { status, proc }
+                        reject(err)
                     } else {
-                        const result: Success = { status, proc }
+                        const result = { status, proc }
                         resolve(result)
                     }
                 })
@@ -247,14 +249,22 @@ export class Command extends LazyPromise<Success, Failure> {
         return this.then(() => buf)
     }
 
-    toNumber(): Promise<number> {
-        return this.then(({ status }) => status).catch(({ status }) => status)
+    async toNumber(): Promise<number> {
+        const { status } = await getResult(this)
+        return status
     }
 
-    toBoolean(): Promise<boolean> {
-        return this.then(
-            () => true,
-            () => false
-        )
+    async toBoolean(): Promise<boolean> {
+        const { status } = await getResult(this)
+        return status === 0
     }
 }
+
+const getResult = (com: Command): Promise<Result> =>
+    com.then(
+        (result) => result,
+        (err: Error | TishError) => {
+            if ((err as TishError).result) return (err as TishError).result!
+            throw err
+        }
+    )
