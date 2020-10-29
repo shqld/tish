@@ -1,8 +1,9 @@
-import createDebug from 'debug'
-import * as cp from 'child_process'
-import * as fs from 'fs'
-import { Writable, PassThrough, Readable } from 'stream'
+import { PassThrough, Readable, Writable } from 'stream'
 import spawn from 'cross-spawn'
+import createDebug from 'debug'
+import { LazyPromise } from './lazy-promise'
+import { Output } from './output'
+import { CommandResult } from './result'
 
 const debug = createDebug('tish')
 
@@ -11,137 +12,99 @@ const getId = () => {
     return `${d.getUTCMilliseconds()}${Math.floor(Math.random() * 100)}`
 }
 
-export interface Config {
-    input?: Readable
-    output?: Writable
-    exit: boolean
-}
+export type Options = Partial<{
+    cwd: string
+    env: Record<string, string>
+    timeout: number
+}>
 
-export type Options = Partial<Config>
-
-const defaultConfig: Config = Object.freeze({
-    input: undefined,
-    output: undefined,
-    exit: false,
+const defaultOptions: Readonly<Options> = Object.freeze({
+    env: undefined,
+    cwd: undefined,
+    timeout: undefined,
 })
 
-const initialChain = () => Promise.resolve()
+export class CommandError extends Error {
+    result: CommandResult
 
-export interface Result {
-    status: number
-    proc: cp.ChildProcess
-}
+    constructor(result: CommandResult) {
+        super('Command Failed')
 
-export interface TishError extends Error {
-    result?: Result
-}
-
-abstract class LazyPromise<T> implements PromiseLike<T> {
-    protected chain: () => Promise<any>
-
-    constructor() {
-        this.chain = initialChain
-    }
-
-    abstract run(): Promise<any>
-
-    then<TResult1 = T, TResult2 = never>(
-        onFulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null,
-        onRejected?:
-            | ((
-                  reason: Error | TishError
-              ) => TResult1 | PromiseLike<TResult1> | TResult2 | PromiseLike<TResult2>)
-            | null
-    ): Promise<TResult1 | TResult2> {
-        // this.debug('then')
-
-        return this.chain()
-            .then(() => this.run())
-            .then(onFulfilled)
-            .catch(onRejected)
-    }
-
-    catch<T>(onRejected: (result: TishError) => T): Promise<any> {
-        // this.debug('catch')
-
-        return this.chain().then(null, onRejected)
+        this.result = result
     }
 }
 
-export class Command extends LazyPromise<Result> {
-    public readonly name: string
-    public readonly args: Array<string>
-    public readonly config: Config
+CommandError.prototype.name = 'CommandError'
+
+export class Command extends LazyPromise<CommandResult> {
+    public readonly options: Readonly<Options>
     public [Symbol.toStringTag] = 'Command'
 
     private id: string
+    private readonly command: string
+    private result?: CommandResult
     private debug: (...args: Array<any>) => void
+    private stdio: Partial<{ stdin: Readable; stdout: Writable; stderr: Writable }> = {
+        stdin: undefined,
+        stdout: undefined,
+        stderr: undefined,
+    }
 
-    constructor(name: string, args: Array<string>, options?: Options) {
+    static create = (command: string, options?: Options): Command => {
+        return new Command(command, options)
+    }
+
+    static context(options: Options): typeof Command.create
+    static context<T, Callback extends ($: typeof Command.create) => Promise<T>>(
+        options: Options,
+        callback: Callback
+    ): Promise<T | void>
+
+    static context(
+        context: Options,
+        callback?: Function
+    ): typeof Command.create | Promise<unknown> {
+        const create = (command: string, options?: Options) =>
+            Command.create(command, { ...context, ...options })
+
+        return callback ? callback(create) : create
+    }
+
+    constructor(command: string, options?: Options) {
         super()
 
         this.id = getId()
-
-        this.name = name
-        this.args = args
-
-        // needed for extend
-        const Class = this.constructor as typeof Command
-
-        this.config = {
-            ...Class.defaultConfig,
-            ...options,
-        }
+        this.command = command
+        this.options = { ...defaultOptions, ...options }
 
         const scopedDebug = debug.extend(this.id)
-        this.debug = (...args) => scopedDebug(`(${[this.name, ...this.args].join(' ')})`, ...args)
+        this.debug = (...args) => scopedDebug(`(${this.command})`, ...args)
+
+        this.chain = this.exec
     }
 
-    static defaultConfig = defaultConfig
-
-    static create<T extends typeof Command>(
-        this: T,
-        command: string,
-        options?: Options
-    ): InstanceType<T> {
-        // needed for extend
-        const Class: T = this
-        const [name, ...args] = command.split(' ')
-
-        return new Class(name, args, options) as InstanceType<T>
-    }
-
-    static extend<T extends typeof Command>(this: T, options: Options): T {
-        // needed for extend
-        const Class = this
-
-        const defaultConfig = {
-            ...Class.defaultConfig,
-            ...options,
-        }
-
-        // @ts-ignore suppress
-        // > A mixin class must have a constructor with a single rest parameter of type 'any[]'.ts(2545)
-        class ExtendedClass extends Class {
-            static defaultConfig = defaultConfig
-        }
-
-        return ExtendedClass
-    }
-
-    run(): Promise<Result> {
+    private exec = (): Promise<CommandResult> => {
         this.debug('run')
 
-        const proc = spawn(this.name, this.args, {
-            stdio: 'pipe',
+        if (this.result) {
+            const { status } = this.result
+
+            if (status === 0) {
+                Promise.resolve(this.result)
+            } else {
+                Promise.reject(new CommandError(this.result))
+            }
+        }
+
+        const [name, ...args] = this.command.split(' ')
+
+        const proc = spawn(name, args, {
+            stdio: [this.stdio.stdin, this.stdio.stdout, this.stdio.stderr],
+            cwd: this.options.cwd,
+            env: this.options.env,
+            timeout: this.options.timeout,
             shell: true,
         })
-
-        if (this.config.output && proc.stdout) proc.stdout.pipe(this.config.output)
-        // TODO(@shqld)
-        proc.stderr?.pipe(process.stderr)
-
-        if (this.config.input && proc.stdin) this.config.input.pipe(proc.stdin)
 
         return new Promise((resolve, reject) => {
             proc.on('exit', (status) => {
@@ -155,38 +118,41 @@ export class Command extends LazyPromise<Result> {
                         throw new Error()
                     }
 
-                    if (status !== 0 && this.config.exit) {
-                        const err: TishError = new Error('Command failed')
-                        err.result = { status, proc }
-                        reject(err)
-                    } else {
-                        const result = { status, proc }
+                    const result: CommandResult = {
+                        command: this.command,
+                        status,
+                        stdout: proc.stdout ? new Output(proc.stdout) : undefined,
+                        stderr: proc.stderr ? new Output(proc.stderr) : undefined,
+                    }
+
+                    this.result = result
+
+                    if (status === 0) {
                         resolve(result)
+                    } else {
+                        reject(new CommandError(result))
                     }
                 })
             })
         })
     }
 
-    async *[Symbol.asyncIterator]() {
-        const passThrough = new PassThrough()
-        passThrough.setEncoding('utf8')
+    toString(source: 'stdout' | 'stderr' | 'both' = 'stdout'): Output {
+        const stream = new PassThrough()
 
-        this.config.output = passThrough
+        if (source === 'both' || source === 'stdout') this.stdio.stdout = stream
+        if (source === 'both' || source === 'stdout') this.stdio.stderr = stream
 
-        await this
-
-        yield passThrough.read()
+        return new Output(stream)
     }
 
     pipe(command: Command | string): Command {
-        this.debug('pipe')
-
         const next = command instanceof Command ? command : Command.create(command)
 
         const passThrough = new PassThrough()
-        this.config.output = passThrough
-        next.config.input = passThrough
+
+        this.stdio.stdout = passThrough
+        next.stdio.stdin = passThrough
 
         const chain = next.chain
         next.chain = () => this.then(chain)
@@ -194,77 +160,16 @@ export class Command extends LazyPromise<Result> {
         return next
     }
 
-    and(command: Command | string): Command {
-        this.debug('and')
+    async quiet(): Promise<boolean> {
+        try {
+            await this
+            return true
+        } catch (err) {
+            if (err instanceof CommandError && err.result.status === 1) {
+                return false
+            }
 
-        const next = command instanceof Command ? command : Command.create(command)
-
-        const chain = next.chain
-        next.chain = () => this.then(chain)
-
-        return next
-    }
-
-    or(command: Command | string): Command {
-        this.debug('or')
-
-        const next = command instanceof Command ? command : Command.create(command)
-
-        const chain = next.chain
-        next.chain = () => this.catch(chain)
-
-        return next
-    }
-
-    // @ts-ignore suppress
-    // > Property 'toString' in type 'Command<T>' is not assignable to the same property in base type 'LazyPromise<T>'.
-    toString(): Promise<string> {
-        const buf: Array<Buffer> = []
-
-        const mock = new PassThrough()
-        mock.on('data', (chunk) => buf.push(chunk))
-
-        this.config.output = mock
-
-        return this.then(() => Buffer.concat(buf).toString().trim())
-    }
-
-    toFile(filePath: string): Promise<void> {
-        this.debug('to')
-
-        this.config.output = fs.createWriteStream(filePath)
-
-        return this.then()
-    }
-
-    toArray(): Promise<Array<string>> {
-        const buf: Array<string> = []
-
-        const mock = new PassThrough()
-        mock.setEncoding('utf8')
-        mock.on('data', (chunk) => buf.push(...chunk.trim().split('\n')))
-
-        this.config.output = mock
-
-        return this.then(() => buf)
-    }
-
-    async toNumber(): Promise<number> {
-        const { status } = await getResult(this)
-        return status
-    }
-
-    async toBoolean(): Promise<boolean> {
-        const { status } = await getResult(this)
-        return status === 0
-    }
-}
-
-const getResult = (com: Command): Promise<Result> =>
-    com.then(
-        (result) => result,
-        (err: Error | TishError) => {
-            if ((err as TishError).result) return (err as TishError).result!
             throw err
         }
-    )
+    }
+}

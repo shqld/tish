@@ -2,6 +2,7 @@
     "compilerOptions": {
         "noEmit": true,
         "strict": true,
-        "esModuleInterop": true
+        "esModuleInterop": true,
+        "target": "ES2015"
     }
 }
