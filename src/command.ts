@@ -1,175 +1,190 @@
-import { PassThrough, Readable, Writable } from 'stream'
+import * as rl from 'readline'
+import { Duplex, DuplexOptions, Readable, Writable } from 'stream'
+import { ChildProcess } from 'child_process'
+import { inherits } from 'util'
+
 import spawn from 'cross-spawn'
-import createDebug from 'debug'
-import { LazyPromise } from './lazy-promise'
-import { Output } from './output'
-import { CommandResult } from './result'
+import _debug, { Debugger } from 'debug'
 
-const debug = createDebug('tish')
+import { Process } from './process'
+import type { CommandResult } from './result'
+import { CommandError } from './error'
+import { cloneReadable } from './util'
 
-const getId = () => {
-    const d = new Date()
-    return `${d.getUTCMilliseconds()}${Math.floor(Math.random() * 100)}`
-}
+const debug = _debug('tish')
 
 export type Options = Partial<{
     cwd: string
     env: Record<string, string>
     timeout: number
+    stream: DuplexOptions
 }>
 
-const defaultOptions: Readonly<Options> = Object.freeze({
+type OnFulfilled<T> = (result: CommandResult) => T
+type OnRejected<T> = (error: unknown | CommandError) => T
+
+const defaultOptions: Options = Object.freeze({
     env: undefined,
     cwd: undefined,
     timeout: undefined,
 })
 
-export class CommandError extends Error {
-    result: CommandResult
+type CommandArgs = [args: Array<string>, options?: Options] | [options?: Options]
 
-    constructor(result: CommandResult) {
-        super('Command Failed')
+export interface Command extends Duplex {}
 
-        this.result = result
-    }
-}
-
-CommandError.prototype.name = 'CommandError'
-
-export class Command extends LazyPromise<CommandResult> {
-    public readonly options: Readonly<Options>
+export class Command implements Duplex, Promise<CommandResult> {
     public [Symbol.toStringTag] = 'Command'
 
-    private id: string
-    private readonly command: string
-    private result?: CommandResult
-    private debug: (...args: Array<any>) => void
-    private stdio: Partial<{ stdin: Readable; stdout: Writable; stderr: Writable }> = {
-        stdin: undefined,
-        stdout: undefined,
-        stderr: undefined,
+    public readonly _id: number
+    public readonly _name: string
+    public readonly _args: Array<string>
+    public _stdout: Readable | null
+    public _stderr: Readable | null
+
+    private _proc: Process
+    private readonly _debug: Debugger
+
+    static create(command: string | Process, ...args: CommandArgs): Command {
+        return new Command(command, ...args)
     }
 
-    static create = (command: string, options?: Options): Command => {
-        return new Command(command, options)
-    }
+    constructor(command: string | Process, ...args: CommandArgs) {
+        const [commandArgs, userOptions] = args.length === 2 ? args : [, args[0]]
+        const options = { ...defaultOptions, ...userOptions }
 
-    static context(options: Options): typeof Command.create
-    static context<T, Callback extends ($: typeof Command.create) => Promise<T>>(
-        options: Options,
-        callback: Callback
-    ): Promise<T | void>
+        Duplex.call(this, options.stream)
 
-    static context(
-        context: Options,
-        callback?: Function
-    ): typeof Command.create | Promise<unknown> {
-        const create = (command: string, options?: Options) =>
-            Command.create(command, { ...context, ...options })
-
-        return callback ? callback(create) : create
-    }
-
-    constructor(command: string, options?: Options) {
-        super()
-
-        this.id = getId()
-        this.command = command
-        this.options = { ...defaultOptions, ...options }
-
-        const scopedDebug = debug.extend(this.id)
-        this.debug = (...args) => scopedDebug(`(${this.command})`, ...args)
-
-        this.chain = this.exec
-    }
-
-    private exec = (): Promise<CommandResult> => {
-        this.debug('run')
-
-        if (this.result) {
-            const { status } = this.result
-
-            if (status === 0) {
-                Promise.resolve(this.result)
-            } else {
-                Promise.reject(new CommandError(this.result))
+        if (typeof command === 'string') {
+            if (commandArgs) {
+                command += ' '
             }
-        }
 
-        const [name, ...args] = this.command.split(' ')
+            const [name, ...args] = command.split(' ')
 
-        const proc = spawn(name, args, {
-            stdio: [this.stdio.stdin, this.stdio.stdout, this.stdio.stderr],
-            cwd: this.options.cwd,
-            env: this.options.env,
-            timeout: this.options.timeout,
-            shell: true,
-        })
-
-        return new Promise((resolve, reject) => {
-            proc.on('exit', (status) => {
-                this.debug('exit', { status })
-
-                proc.on('close', () => {
-                    this.debug('close')
-
-                    if (typeof status !== 'number') {
-                        // TODO(@shqld): a dedicated error
-                        throw new Error()
-                    }
-
-                    const result: CommandResult = {
-                        command: this.command,
-                        status,
-                        stdout: proc.stdout ? new Output(proc.stdout) : undefined,
-                        stderr: proc.stderr ? new Output(proc.stderr) : undefined,
-                    }
-
-                    this.result = result
-
-                    if (status === 0) {
-                        resolve(result)
-                    } else {
-                        reject(new CommandError(result))
-                    }
-                })
+            this._proc = spawn(name, args, {
+                stdio: 'pipe',
+                cwd: options.cwd,
+                env: options.env,
+                timeout: options.timeout,
             })
-        })
-    }
-
-    toString(source: 'stdout' | 'stderr' | 'both' = 'stdout'): Output {
-        const stream = new PassThrough()
-
-        if (source === 'both' || source === 'stdout') this.stdio.stdout = stream
-        if (source === 'both' || source === 'stdout') this.stdio.stderr = stream
-
-        return new Output(stream)
-    }
-
-    pipe(command: Command | string): Command {
-        const next = command instanceof Command ? command : Command.create(command)
-
-        const passThrough = new PassThrough()
-
-        this.stdio.stdout = passThrough
-        next.stdio.stdin = passThrough
-
-        const chain = next.chain
-        next.chain = () => this.then(chain)
-
-        return next
-    }
-
-    async quiet(): Promise<boolean> {
-        try {
-            await this
-            return true
-        } catch (err) {
-            if (err instanceof CommandError && err.result.status === 1) {
-                return false
-            }
-
-            throw err
+            this._name = name
+            this._args = args
+        } else {
+            this._proc = command
+            this._name = this._proc.spawnfile
+            this._args = this._proc.spawnargs
         }
+
+        this._id = this._proc.pid
+        this._debug = debug.extend(this._name).extend((this._id as unknown) as string)
+
+        this._debug('spawn (pid: %s)', this._id)
+
+        if (this._proc.stdin) {
+            this.once('unpipe', () => {
+                this._proc.stdin!.end()
+            })
+            this.once('end', () => {
+                this._proc.stdin!.end()
+            })
+        }
+
+        this._stdout = this._proc.stdout
+        this._stderr = this._proc.stderr
+
+        if (this._proc.stdout) {
+            let backpressured = false
+
+            this._proc.stdout.on('data', (data) => {
+                if (backpressured) {
+                    this.once('drain', () => {
+                        backpressured = false
+                        this.push(data)
+                    })
+                } else if (!this.push(data)) {
+                    backpressured = true
+                    this._debug('backpressure')
+                }
+            })
+
+            this._proc.stdout.once('end', () => {
+                process.nextTick(() => this.push(null))
+            })
+        }
+    }
+
+    get argv(): string {
+        return [this._name, this._args].join(' ')
+    }
+
+    get process(): Readonly<ChildProcess> {
+        return this._proc as ChildProcess
+    }
+
+    public [Symbol.asyncIterator](): AsyncIterableIterator<string> {
+        return rl
+            .createInterface({
+                input: this,
+                crlfDelay: Infinity,
+            })
+            [Symbol.asyncIterator]()
+    }
+
+    public then(): Promise<void>
+    public then<T>(onFulfilled: OnFulfilled<T>): Promise<T>
+    public then<T, C>(onFulfilled: OnFulfilled<T>, onRejected: OnRejected<C>): Promise<T | C>
+    public then(onFulfilled?: OnFulfilled<any>, onRejected?: OnRejected<any>): Promise<any> {
+        return this._chain.then(onFulfilled, onRejected)
+    }
+
+    public catch(): Promise<void>
+    public catch<C>(onRejected: OnRejected<C>): Promise<C>
+    public catch(onRejected?: OnRejected<any>): Promise<any> {
+        return this._chain.catch(onRejected)
+    }
+
+    public finally(onFinally?: () => void) {
+        return this._chain.finally(onFinally)
+    }
+
+    public _read(_size: number): void {}
+    public _write(
+        chunk: any,
+        encoding: BufferEncoding,
+        done: (error: Error | null | undefined) => void
+    ): void {
+        this._proc.stdin?.write(chunk, encoding, done)
+    }
+
+    private _promise: Promise<unknown> = Promise.resolve()
+    private get _chain(): Promise<CommandResult> {
+        return this._promise.then(
+            () =>
+                new Promise((resolve, reject) => {
+                    this._proc.on('exit', (status) => {
+                        if (typeof status !== 'number') {
+                            throw new Error('Command exited unsuccessfully')
+                        }
+
+                        const result = { status, command: this }
+
+                        if (status === 0) {
+                            resolve(result)
+                        } else {
+                            if (this._proc.stdout) {
+                                this._stdout = cloneReadable(this._proc.stdout)
+                            }
+                            if (this._proc.stderr) {
+                                this._stderr = cloneReadable(this._proc.stderr)
+                            }
+
+                            reject(new CommandError(result))
+                        }
+                    })
+                })
+        )
     }
 }
+
+inherits(Command, Duplex)
