@@ -45,6 +45,36 @@ Handling large data is optimized with `streams`, so that large data.
 
 No child process are run unless called with `await` keyword or `then` method, even if they are chained.
 
+## Usage
+
+```ts
+// call simply
+const result = await $('echo hello')
+// or
+$('echo hello')
+    .then(result => {})
+
+// run sequencially
+$('git add .')
+    .then($('git commit -m "commit"')
+
+// run parallel
+await Promise.allSettled(
+    $('git add file_a'),
+    $('git add file_b'),
+)
+
+// read lines async
+for await (const log of $('git log --oneline')) {
+    console.log(log)
+}
+
+// pipe to/from
+fs.createReadStream('file_a')
+    .pipe($('gzip'))
+    .pipe(fs.createWriteStream('file_b'))
+```
+
 ## Roadmap
 
 -   [ ] Enriching options, e.g. watermark, etc...
