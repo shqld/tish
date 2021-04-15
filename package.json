@@ -12,6 +12,7 @@
         "src/*"
     ],
     "scripts": {
+        "prepare": "husky install",
         "dev": "babel-node -x .ts",
         "build": "rollup -c",
         "test": "tsc && jest",
@@ -20,11 +21,6 @@
     "dependencies": {
         "cross-spawn": "^7.0.2",
         "debug": "^4.1.1"
-    },
-    "husky": {
-        "hooks": {
-            "pre-commit": "pretty-quick --staged && yarn test"
-        }
     },
     "devDependencies": {
         "@babel/cli": "^7.8.3",
