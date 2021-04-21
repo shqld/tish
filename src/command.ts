@@ -1,39 +1,22 @@
 import * as rl from 'readline'
-import { Duplex, DuplexOptions, Readable, Writable } from 'stream'
+import { Duplex, Readable } from 'stream'
 import { ChildProcess } from 'child_process'
-import { inherits } from 'util'
 
 import spawn from 'cross-spawn'
 import _debug, { Debugger } from 'debug'
 
-import { Process } from './process'
+import type { Process } from './process'
 import type { CommandResult } from './result'
 import { CommandError } from './error'
 import { cloneReadable } from './util'
+import type { Options } from './options'
 
 const debug = _debug('tish')
-
-export type Options = Partial<{
-    cwd: string
-    env: Record<string, string>
-    timeout: number
-    stream: DuplexOptions
-}>
 
 type OnFulfilled<T> = (result: CommandResult) => T
 type OnRejected<T> = (error: unknown | CommandError) => T
 
-const defaultOptions: Options = Object.freeze({
-    env: undefined,
-    cwd: undefined,
-    timeout: undefined,
-})
-
-type CommandArgs = [args: Array<string>, options?: Options] | [options?: Options]
-
-export interface Command extends Duplex {}
-
-export class Command implements Duplex, Promise<CommandResult> {
+export class Command extends Duplex implements Promise<CommandResult> {
     public [Symbol.toStringTag] = 'Command'
 
     public readonly _id: number
@@ -44,22 +27,14 @@ export class Command implements Duplex, Promise<CommandResult> {
 
     private _proc: Process
     private readonly _debug: Debugger
+    public readonly options: Options
 
-    static create(command: string | Process, ...args: CommandArgs): Command {
-        return new Command(command, ...args)
-    }
+    constructor(command: string | Process, options: Options) {
+        super(options.stream)
 
-    constructor(command: string | Process, ...args: CommandArgs) {
-        const [commandArgs, userOptions] = args.length === 2 ? args : [, args[0]]
-        const options = { ...defaultOptions, ...userOptions }
-
-        Duplex.call(this, options.stream)
+        this.options = options
 
         if (typeof command === 'string') {
-            if (commandArgs) {
-                command += ' '
-            }
-
             const [name, ...args] = command.split(' ')
 
             this._proc = spawn(name, args, {
@@ -186,5 +161,3 @@ export class Command implements Duplex, Promise<CommandResult> {
         )
     }
 }
-
-inherits(Command, Duplex)

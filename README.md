@@ -117,7 +117,7 @@ async function addAndCommit({
 ## Usage
 
 ```ts
-import { $, stdout, stderr, stdouterr, isSuccessful } from 'tish'
+import { $, stdout, stderr, stdouterr, isSuccessful, shell } from 'tish'
 
 // call simply
 // -----------
@@ -183,6 +183,15 @@ if (await isSuccessful($('git diff --exit-code'))) {
 } else {
     await $('git commit .')
 }
+
+// extend shell
+// ------------
+const { $ } = shell({
+    cwd: path.resolve('projects'),
+    env: {
+        NODE_ENV: 'development',
+    },
+})
 ```
 
 ## Install

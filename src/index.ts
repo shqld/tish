@@ -1,9 +1,13 @@
 import { Command } from './command'
+import { defaultOptions } from './options'
+import { shell, CommandFactory } from './shell'
 import { isNonNullable } from './util'
 
 export * from './command'
 
-export const $: typeof Command.create = Command.create.bind(Command)
+export { shell } from './shell'
+
+export const $: CommandFactory = shell(defaultOptions)
 
 export function isSuccessful(command: Command): Promise<boolean> {
     return command.then(
