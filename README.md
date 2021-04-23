@@ -197,8 +197,8 @@ const { $ } = shell({
 ## Install
 
 ```sh
-$ npm install -D tish
-$ yarn add -D tish
+$ npm install -D tish@^0.1.0
+$ yarn add -D tish@^0.1.0
 ```
 
 ## What's not
