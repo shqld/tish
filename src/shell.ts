@@ -1,3 +1,4 @@
+import deepmerge from 'deepmerge'
 import { Command } from './command'
 import type { Options } from './options'
 import type { Process } from './process'
@@ -13,15 +14,7 @@ export interface CommandFactory {
 
 export function shell(shellOptions: Partial<Options>, extend?: CommandFactory): CommandFactory {
     if (extend?.[kOptions]) {
-        const originalOptions = extend[kOptions]!
-
-        Object.keys(originalOptions).forEach((key as keyof Options) => {
-            if (key in shellOptions) {
-                shellOptions[key] = { ...originalOptions[key], ...shellOptions[key] }
-            } else {
-                shellOptions[key] = originalOptions[key]
-            }
-        })
+        shellOptions = deepmerge(extend[kOptions]!, shellOptions)
     }
 
     const $: CommandFactory = (
