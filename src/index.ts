@@ -4,7 +4,7 @@ import { shell, CommandFactory } from './shell'
 import { isNonNullable } from './util'
 
 export * from './command'
-
+export { CommandError } from './error'
 export { shell } from './shell'
 
 export const $: CommandFactory = shell(defaultOptions)
