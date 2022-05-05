@@ -4,7 +4,7 @@ import { $ } from '../../src'
 import { MockProcess } from '../../__mock__/process'
 import { MockReadable } from '../lib/mock-stream'
 
-process.on('unhandledRejection', console.error)
+process.on('unhandledRejection', () => process.exit(1))
 
 const FIXTURE_TEXT = 'Hello, world.'
 

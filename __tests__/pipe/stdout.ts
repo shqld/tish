@@ -2,7 +2,7 @@ import { $ } from '../../src'
 import { MockProcess } from '../../__mock__/process'
 import { MockWritable } from '../lib/mock-stream'
 
-process.on('unhandledRejection', console.error)
+process.on('unhandledRejection', () => process.exit(1))
 
 describe('pipe', () => {
     describe('stdout', () => {

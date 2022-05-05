@@ -3,7 +3,7 @@ import { CommandError } from '../src/error'
 import { CommandResult } from '../src/result'
 import { MockProcess } from '../__mock__/process'
 
-process.on('unhandledRejection', console.error)
+process.on('unhandledRejection', () => process.exit(1))
 
 describe('promise', () => {
     beforeEach(() => {

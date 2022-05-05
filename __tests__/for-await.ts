@@ -1,7 +1,7 @@
 import { $ } from '../src'
 import { MockProcess } from '../__mock__/process'
 
-process.on('unhandledRejection', console.error)
+process.on('unhandledRejection', () => process.exit(1))
 
 describe('for...await', () => {
     test('read stdout by line', async () => {

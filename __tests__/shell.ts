@@ -1,7 +1,7 @@
 import { CommandFactory, shell } from '../src/shell'
 import { MockProcess } from '../__mock__/process'
 
-process.on('unhandledRejection', console.error)
+process.on('unhandledRejection', () => process.exit(1))
 
 describe('shell', () => {
     beforeEach(() => {
