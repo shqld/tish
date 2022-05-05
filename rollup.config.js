@@ -10,11 +10,18 @@ const isDev = process.env.BUILD_ENV === 'development'
 /** @type {import('rollup').RollupOptions} */
 const config = {
     input: 'src/index.ts',
-    output: {
-        dir: 'dist',
-        format: 'cjs',
-        sourcemap: true,
-    },
+    output: [
+        {
+            file: 'dist/index.js',
+            format: 'cjs',
+            sourcemap: true,
+        },
+        {
+            file: 'dist/index.mjs',
+            format: 'esm',
+            sourcemap: true,
+        },
+    ],
     plugins: [
         resolve({
             extensions: ['.ts'],
